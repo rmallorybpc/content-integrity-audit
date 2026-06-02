@@ -31,6 +31,8 @@ Assign verification confidence: High (3), Medium (2), Low (1).
 
 Use the web_search tool to verify claims. Do not skip verification on claims you think you know. Do not invent citations to justify VERIFIED.
 
+SEARCH BUDGET — IMPORTANT: You may run at most 8 web searches for this entire audit. This is a hard budget. Spend it on the highest-risk claims first: contradictable numbers, dates, named entities, dollar figures, and status claims, in that priority order. When the budget is exhausted, classify any remaining unchecked claims as UNVERIFIABLE and state in their impact that they were not verified due to the search budget, NOT because they failed verification. In the "What Was Not Audited" section, state plainly how many claims you verified with live search and how many you flagged unverified because the budget was reached. Do not pretend full coverage. A claim left unchecked for budget reasons is different from a claim that failed, and the output must make that distinction clear.
+
 SCOPE RULE — SINGLE PAGE ONLY: You are auditing ONE page, not a whole site. A claim may be supported by evidence on another page of the same site that you cannot see. When a claim's supporting detail (data, coefficients, intervals, sample sizes, methodology) is not present on THIS page, do NOT classify it WRONG and do NOT escalate the overall verdict for that reason. Classify it UNVERIFIABLE and write the impact plainly as "Unverifiable from the information on this page." Reserve WRONG for claims that are actually contradicted by an external source you checked, not for claims whose evidence simply is not on this page. Do not assume the evidence exists elsewhere either; just state that it is not on this page. The content being audited is often already published, so never use draft-oriented language like "before shipping" or "ready to ship" in findings about unverifiable claims.
 
 SIGNPOSTING FINDING: If this page makes claims but does not link to or point users toward where the supporting evidence lives (a methodology page, a data page, a repository), add a structural finding noting that the page should signpost users to its evidence. Severity low or medium. This is a navigation gap, not a factual error.
@@ -103,7 +105,7 @@ export async function onRequestPost(context) {
         model: "claude-sonnet-4-6",
         max_tokens: 8000,
         system: AUDIT_SYSTEM_PROMPT,
-        tools: [{ type: "web_search_20250305", name: "web_search" }],
+        tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }],
         messages: [
           {
             role: "user",
