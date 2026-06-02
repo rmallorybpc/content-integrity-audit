@@ -65,35 +65,87 @@ Order findings by severity: WRONG/FAIL first, then SOFT/WARN, then UNVERIFIABLE,
 export async function onRequestPost(context) {
   const { request, env } = context;
 
-  // CORS preflight is handled separately below; this handles the real POST.
+  // Beta caps. Kept as named constants so they are easy to tune later.
+  const MAX_PDF_BYTES = 5 * 1024 * 1024; // 5 MB
+  const MAX_PDF_PAGES = 10;
+
   try {
     const body = await request.json();
-    const targetUrl = (body.url || "").trim();
+    const mode = body.mode === "document" ? "document" : "url";
 
-    if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
-      return json({ error: "Provide a valid URL starting with http:// or https://" }, 400);
-    }
+    // Build the user message content differently depending on input type,
+    // then converge on a single API call below.
+    let userContent;
+    let sourceLabel;
 
-    // Fetch the target page content.
-    let pageText = "";
-    try {
-      const pageResp = await fetch(targetUrl, {
-        headers: { "User-Agent": "content-integrity-audit/1.0" },
-      });
-      if (!pageResp.ok) {
-        return json({ error: `Could not fetch the URL. It returned status ${pageResp.status}.` }, 422);
+    if (mode === "document") {
+      const pdfData = (body.fileData || "").trim(); // base64, no data: prefix
+      const fileName = (body.fileName || "uploaded.pdf").trim();
+
+      if (!pdfData) {
+        return json({ error: "No document data received. Choose a PDF and try again." }, 400);
       }
-      const html = await pageResp.text();
-      pageText = stripHtml(html).slice(0, 50000); // cap to keep token use sane
-    } catch (e) {
-      return json({ error: "Could not reach the URL. Check that it is public and correct." }, 422);
+
+      // Size check. base64 is ~4/3 the size of the raw bytes, so decode-size estimate:
+      const approxBytes = Math.floor((pdfData.length * 3) / 4);
+      if (approxBytes > MAX_PDF_BYTES) {
+        return json({ error: `That PDF is about ${(approxBytes / 1048576).toFixed(1)} MB. The beta limit is 5 MB. Please upload a smaller file.` }, 413);
+      }
+
+      // Page count check. Count PDF page objects in the decoded bytes.
+      const pageCount = countPdfPages(pdfData);
+      if (pageCount > MAX_PDF_PAGES) {
+        return json({ error: `That PDF has about ${pageCount} pages. The beta limit is 10 pages. Please upload a shorter document.` }, 413);
+      }
+
+      sourceLabel = fileName;
+      userContent = [
+        {
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: pdfData },
+        },
+        {
+          type: "text",
+          text:
+            `Audit the attached PDF document named "${fileName}". ` +
+            `Apply the same two-layer audit. For the structural layer, assess the document's ` +
+            `internal consistency, completeness, and whether claims are signposted to their evidence. ` +
+            `For the factual layer, verify claims against current sources within the search budget. ` +
+            `Return only the JSON object described in your instructions.`,
+        },
+      ];
+    } else {
+      const targetUrl = (body.url || "").trim();
+      if (!targetUrl || !/^https?:\/\//i.test(targetUrl)) {
+        return json({ error: "Provide a valid URL starting with http:// or https://" }, 400);
+      }
+
+      let pageText = "";
+      try {
+        const pageResp = await fetch(targetUrl, {
+          headers: { "User-Agent": "content-integrity-audit/1.0" },
+        });
+        if (!pageResp.ok) {
+          return json({ error: `Could not fetch the URL. It returned status ${pageResp.status}.` }, 422);
+        }
+        const html = await pageResp.text();
+        pageText = stripHtml(html).slice(0, 50000);
+      } catch (e) {
+        return json({ error: "Could not reach the URL. Check that it is public and correct." }, 422);
+      }
+
+      if (!pageText || pageText.length < 40) {
+        return json({ error: "The page returned almost no readable text to audit." }, 422);
+      }
+
+      sourceLabel = targetUrl;
+      userContent =
+        `Audit the following page content. The page URL is ${targetUrl}\n\n` +
+        `Return only the JSON object described in your instructions.\n\n` +
+        `--- PAGE CONTENT START ---\n${pageText}\n--- PAGE CONTENT END ---`;
     }
 
-    if (!pageText || pageText.length < 40) {
-      return json({ error: "The page returned almost no readable text to audit." }, 422);
-    }
-
-    // Call the Anthropic API with web search enabled so the factual layer can verify.
+    // Single API call for both modes. Same system prompt, same search cap.
     const apiResp = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -106,17 +158,10 @@ export async function onRequestPost(context) {
         max_tokens: 8000,
         system: AUDIT_SYSTEM_PROMPT,
         tools: [{ type: "web_search_20250305", name: "web_search", max_uses: 8 }],
-        messages: [
-          {
-            role: "user",
-            content:
-              `Audit the following page content. The page URL is ${targetUrl}\n\n` +
-              `Return only the JSON object described in your instructions.\n\n` +
-              `--- PAGE CONTENT START ---\n${pageText}\n--- PAGE CONTENT END ---`,
-          },
-        ],
+        messages: [{ role: "user", content: userContent }],
       }),
     });
+
 
     if (!apiResp.ok) {
       const errText = await apiResp.text();
@@ -142,7 +187,7 @@ export async function onRequestPost(context) {
       return json({ error: "Could not parse the audit result.", raw: textOut.slice(0, 4000) }, 502);
     }
 
-    return json({ url: targetUrl, audit: parsed }, 200);
+    return json({ source: sourceLabel, audit: parsed }, 200);
   } catch (e) {
     return json({ error: "Unexpected error.", detail: String(e).slice(0, 300) }, 500);
   }
@@ -183,4 +228,23 @@ function stripHtml(html) {
     .replace(/&gt;/gi, ">")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+// Estimate PDF page count from base64 data. Decodes the bytes and counts
+// page objects. This is an estimate, not a parser, but it is reliable enough
+// to enforce a page cap. If counting fails, return 0 so the audit proceeds
+// (the size cap still bounds cost).
+function countPdfPages(base64) {
+  try {
+    const binary = atob(base64);
+    // Count occurrences of "/Type /Page" (not "/Pages"). Tolerate spacing.
+    const matches = binary.match(/\/Type\s*\/Page[^s]/g);
+    if (matches && matches.length > 0) return matches.length;
+    // Fallback: count "/Count N" in the page tree if present.
+    const countMatch = binary.match(/\/Count\s+(\d+)/);
+    if (countMatch) return parseInt(countMatch[1], 10);
+    return 0;
+  } catch (e) {
+    return 0;
+  }
 }
