@@ -26,6 +26,9 @@
   }
   .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
   h1 { font-size: 22px; margin: 0 0 4px; }
+  .beta { display: inline-block; font-size: 11px; font-weight: bold; vertical-align: middle;
+    padding: 2px 8px; margin-left: 6px; border-radius: 3px; background: var(--info); color: #fff;
+    text-transform: uppercase; letter-spacing: 0.05em; }
   .sub { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
   .controls { display: flex; gap: 8px; margin-bottom: 8px; }
   input[type="url"] {
@@ -71,7 +74,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>Content Integrity Audit</h1>
+  <h1>Content Integrity Audit <span class="beta">Beta</span></h1>
   <p class="sub">Structural and factual audit of a single public web page.</p>
 
   <div class="controls">
