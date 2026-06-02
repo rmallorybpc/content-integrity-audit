@@ -70,13 +70,13 @@
 <body>
 <div class="wrap">
   <h1>Content Integrity Audit</h1>
-  <p class="sub">Structural and factual audit of any public web page.</p>
+  <p class="sub">Structural and factual audit of a single public web page.</p>
 
   <div class="controls">
     <input id="url" type="url" placeholder="https://example.com/page-to-audit" />
     <button id="run">Run Audit</button>
   </div>
-  <p class="hint">Enter a public URL. The audit fetches the page, checks structure, and verifies factual claims against current sources. This can take up to a minute.</p>
+  <p class="hint">Audits only the exact URL you paste. It does not crawl or scan other pages on the site. If a claim's supporting evidence lives on a different page, it will be marked unverifiable from this page rather than wrong. Whole-site auditing is a planned later feature. The audit fetches the page, checks structure, and verifies factual claims against current sources. This can take up to a minute.</p>
 
   <div id="status" class="status"></div>
   <div id="results"></div>
