@@ -1,8 +1,182 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>content-integrity-audit</title>
-  </head>
-  <body></body>
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Content Integrity Audit</title>
+<style>
+  /* Deliberately plain. Function-first skeleton. Design comes in a later phase. */
+  :root {
+    --critical: #b91c1c;
+    --high: #c2410c;
+    --medium: #a16207;
+    --low: #4d7c0f;
+    --info: #475569;
+    --border: #d4d4d8;
+    --bg: #fafafa;
+    --panel: #ffffff;
+    --text: #18181b;
+    --muted: #71717a;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    margin: 0; background: var(--bg); color: var(--text);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 32px 20px 80px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); font-size: 14px; margin: 0 0 28px; }
+  .controls { display: flex; gap: 8px; margin-bottom: 8px; }
+  input[type="url"] {
+    flex: 1; padding: 10px 12px; font: inherit; font-size: 14px;
+    border: 1px solid var(--border); border-radius: 4px; background: var(--panel);
+  }
+  button {
+    padding: 10px 18px; font: inherit; font-size: 14px; cursor: pointer;
+    border: 1px solid var(--text); background: var(--text); color: #fff;
+    border-radius: 4px;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); margin: 0 0 24px; }
+  .status { margin: 24px 0; font-size: 14px; }
+  .err { color: var(--critical); white-space: pre-wrap; }
+  .verdict {
+    margin: 24px 0; padding: 12px 16px; border-radius: 4px;
+    border: 1px solid var(--border); background: var(--panel); font-weight: bold;
+  }
+  .summary { margin: 16px 0; padding: 12px 16px; background: var(--panel);
+    border: 1px solid var(--border); border-radius: 4px; font-size: 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 13px; }
+  th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border);
+    vertical-align: top; }
+  th { background: #f1f5f9; font-size: 12px; text-transform: uppercase; letter-spacing: 0.03em; }
+  .pill { display: inline-block; padding: 2px 8px; border-radius: 3px; font-size: 11px;
+    font-weight: bold; color: #fff; white-space: nowrap; }
+  .s-critical, .r-WRONG, .r-FAIL { background: var(--critical); }
+  .s-high { background: var(--high); }
+  .s-medium, .r-SOFT, .r-WARN { background: var(--medium); }
+  .s-low { background: var(--low); }
+  .s-info, .r-UNVERIFIABLE { background: var(--info); }
+  .r-VERIFIED, .r-PASS { background: var(--low); }
+  .layer { font-size: 11px; color: var(--muted); text-transform: uppercase; }
+  section h2 { font-size: 14px; margin: 28px 0 8px; text-transform: uppercase;
+    letter-spacing: 0.04em; color: var(--muted); }
+  ul { margin: 8px 0; padding-left: 20px; font-size: 13px; }
+  li { margin-bottom: 6px; }
+  .step-action { font-weight: bold; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Content Integrity Audit</h1>
+  <p class="sub">Structural and factual audit of any public web page.</p>
+
+  <div class="controls">
+    <input id="url" type="url" placeholder="https://example.com/page-to-audit" />
+    <button id="run">Run Audit</button>
+  </div>
+  <p class="hint">Enter a public URL. The audit fetches the page, checks structure, and verifies factual claims against current sources. This can take up to a minute.</p>
+
+  <div id="status" class="status"></div>
+  <div id="results"></div>
+</div>
+
+<script>
+  const runBtn = document.getElementById("run");
+  const urlInput = document.getElementById("url");
+  const statusEl = document.getElementById("status");
+  const resultsEl = document.getElementById("results");
+
+  runBtn.addEventListener("click", runAudit);
+  urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });
+
+  async function runAudit() {
+    const url = urlInput.value.trim();
+    resultsEl.innerHTML = "";
+    if (!url) { setStatus("Enter a URL first.", true); return; }
+
+    runBtn.disabled = true;
+    setStatus("Auditing. Fetching the page and verifying claims. This can take up to a minute.");
+
+    try {
+      const resp = await fetch("/api/audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ url }),
+      });
+      const data = await resp.json();
+
+      if (!resp.ok) {
+        setStatus("Audit failed: " + (data.error || resp.status) + (data.detail ? "\n" + data.detail : ""), true);
+        return;
+      }
+      setStatus("");
+      render(data.audit, data.url);
+    } catch (e) {
+      setStatus("Network error: " + e.message, true);
+    } finally {
+      runBtn.disabled = false;
+    }
+  }
+
+  function setStatus(msg, isErr) {
+    statusEl.innerHTML = msg ? `<div class="${isErr ? "err" : ""}">${escapeHtml(msg)}</div>` : "";
+  }
+
+  function render(a, url) {
+    if (!a) { setStatus("No audit data returned.", true); return; }
+    let html = "";
+
+    if (a.verdict) html += `<div class="verdict">Verdict: ${escapeHtml(a.verdict)}</div>`;
+    if (a.summary) html += `<div class="summary">${escapeHtml(a.summary)}</div>`;
+
+    if (Array.isArray(a.findings) && a.findings.length) {
+      html += `<section><h2>Findings (${a.findings.length})</h2><table><thead><tr>
+        <th>Layer</th><th>Claim / Issue</th><th>Source cited</th><th>Result</th>
+        <th>Conf.</th><th>Correction</th><th>Severity</th></tr></thead><tbody>`;
+      for (const f of a.findings) {
+        html += `<tr>
+          <td class="layer">${escapeHtml(f.layer || "")}</td>
+          <td>${escapeHtml(f.claim || "")}<div class="layer">${escapeHtml(f.impact || "")}</div></td>
+          <td>${escapeHtml(f.sourceAsCited || "")}</td>
+          <td><span class="pill r-${escapeAttr(f.result)}">${escapeHtml(f.result || "")}</span></td>
+          <td>${f.confidence != null ? escapeHtml(String(f.confidence)) : ""}</td>
+          <td>${escapeHtml(f.correction || "")}</td>
+          <td><span class="pill s-${escapeAttr(f.severity)}">${escapeHtml(f.severity || "")}</span></td>
+        </tr>`;
+      }
+      html += `</tbody></table></section>`;
+    }
+
+    html += listSection("Patterns Across Findings", a.patterns);
+    html += listSection("What Was Not Audited", a.notAudited);
+
+    if (Array.isArray(a.nextSteps) && a.nextSteps.length) {
+      html += `<section><h2>Recommended Next Steps</h2><ul>`;
+      for (const s of a.nextSteps) {
+        html += `<li><span class="step-action">${escapeHtml(s.action || "")}:</span> ${escapeHtml(s.detail || "")}</li>`;
+      }
+      html += `</ul></section>`;
+    }
+
+    resultsEl.innerHTML = html;
+  }
+
+  function listSection(title, arr) {
+    if (!Array.isArray(arr) || !arr.length) return "";
+    let h = `<section><h2>${escapeHtml(title)}</h2><ul>`;
+    for (const item of arr) h += `<li>${escapeHtml(item)}</li>`;
+    return h + `</ul></section>`;
+  }
+
+  function escapeHtml(s) {
+    return String(s == null ? "" : s)
+      .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+  function escapeAttr(s) {
+    return String(s == null ? "" : s).replace(/[^a-zA-Z0-9_-]/g, "");
+  }
+</script>
+</body>
 </html>
