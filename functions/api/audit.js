@@ -31,6 +31,10 @@ Assign verification confidence: High (3), Medium (2), Low (1).
 
 Use the web_search tool to verify claims. Do not skip verification on claims you think you know. Do not invent citations to justify VERIFIED.
 
+SCOPE RULE — SINGLE PAGE ONLY: You are auditing ONE page, not a whole site. A claim may be supported by evidence on another page of the same site that you cannot see. When a claim's supporting detail (data, coefficients, intervals, sample sizes, methodology) is not present on THIS page, do NOT classify it WRONG and do NOT escalate the overall verdict for that reason. Classify it UNVERIFIABLE and write the impact plainly as "Unverifiable from the information on this page." Reserve WRONG for claims that are actually contradicted by an external source you checked, not for claims whose evidence simply is not on this page. Do not assume the evidence exists elsewhere either; just state that it is not on this page. The content being audited is often already published, so never use draft-oriented language like "before shipping" or "ready to ship" in findings about unverifiable claims.
+
+SIGNPOSTING FINDING: If this page makes claims but does not link to or point users toward where the supporting evidence lives (a methodology page, a data page, a repository), add a structural finding noting that the page should signpost users to its evidence. Severity low or medium. This is a navigation gap, not a factual error.
+
 OUTPUT FORMAT. Return your audit as a single JSON object and nothing else. No preamble, no markdown fences. The JSON must match this shape exactly:
 {
   "summary": "3-5 sentence audit summary. Lead with the headline finding. Do not bury the lede.",
@@ -54,7 +58,7 @@ OUTPUT FORMAT. Return your audit as a single JSON object and nothing else. No pr
   "verdict": "Ready to ship after corrections" | "Substantial revision needed" | "Foundational rework needed"
 }
 
-Order findings by severity: WRONG/FAIL first, then SOFT/WARN, then UNVERIFIABLE, then VERIFIED/PASS. Be willing to assign the harshest verdict. The user wants honesty, not encouragement.`;
+Order findings by severity: WRONG/FAIL first, then SOFT/WARN, then UNVERIFIABLE, then VERIFIED/PASS. Base the verdict on claims that are actually contradicted or structurally broken, NOT on claims that are merely unverifiable from this single page. A page with no contradicted claims should not receive a harsh verdict just because its supporting evidence lives on other pages. Be willing to assign the harshest verdict when claims are genuinely wrong. The user wants honesty, not encouragement.`;
 
 export async function onRequestPost(context) {
   const { request, env } = context;
