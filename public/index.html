@@ -38,6 +38,8 @@
     border-radius: 4px;
   }
   button:disabled { opacity: 0.5; cursor: default; }
+  button.secondary { background: var(--panel); color: var(--text); }
+  button.secondary:hover { background: #f1f5f9; }
   .hint { font-size: 12px; color: var(--muted); margin: 0 0 24px; }
   .status { margin: 24px 0; font-size: 14px; }
   .err { color: var(--critical); white-space: pre-wrap; }
@@ -75,6 +77,7 @@
   <div class="controls">
     <input id="url" type="url" placeholder="https://example.com/page-to-audit" />
     <button id="run">Run Audit</button>
+    <button id="clear" class="secondary">Clear</button>
   </div>
   <p class="hint">Audits only the exact URL you paste. It does not crawl or scan other pages on the site. If a claim's supporting evidence lives on a different page, it will be marked unverifiable from this page rather than wrong. Whole-site auditing is a planned later feature. The audit fetches the page, checks structure, and verifies factual claims against current sources. This can take up to a minute.</p>
 
@@ -84,12 +87,23 @@
 
 <script>
   const runBtn = document.getElementById("run");
+  const clearBtn = document.getElementById("clear");
   const urlInput = document.getElementById("url");
   const statusEl = document.getElementById("status");
   const resultsEl = document.getElementById("results");
 
   runBtn.addEventListener("click", runAudit);
+  clearBtn.addEventListener("click", resetPage);
   urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runAudit(); });
+
+  // Clear is purely browser-side: empties the input and wipes results.
+  // It makes no API call, so it costs nothing.
+  function resetPage() {
+    urlInput.value = "";
+    resultsEl.innerHTML = "";
+    setStatus("");
+    urlInput.focus();
+  }
 
   async function runAudit() {
     const url = urlInput.value.trim();
