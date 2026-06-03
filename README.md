@@ -1,14 +1,14 @@
 # Content Integrity Audit
 
-A tool that audits a web page or a PDF document on two layers: structural integrity and factual integrity. Paste a URL or upload a PDF, and the tool returns a single structured report with findings ordered by severity.
+A tool that audits a web page on two layers: structural integrity and factual integrity. Paste a URL and the tool returns a single structured report with findings ordered by severity.
 
-**Current version: v0.3.0 (beta)**
+**Current version: v0.3.1 (beta)**
 
 ---
 
 ## What it does
 
-The audit runs two layers on whatever you give it.
+The audit runs two layers on the page you give it.
 
 The structural layer looks at how the content holds together: links, asset availability, internal consistency, completeness, and whether claims point users toward their supporting evidence.
 
@@ -18,11 +18,11 @@ The report combines both layers: a summary, a findings table ordered worst first
 
 ---
 
-## Two ways to use it
+## How to use it
 
 **Audit a URL.** Paste a single public URL. The tool audits only that exact page. It does not crawl or scan other pages on the site. If a claim's supporting evidence lives on a different page, the claim is marked unverifiable from this page rather than wrong. Whole-site auditing is a planned later feature.
 
-**Audit a PDF.** Upload a single PDF. The tool reads the document and runs the same two-layer audit. Beta limits apply: 10 pages and 5 MB per file. These limits keep each audit fast and focused during the beta. Word documents are not supported yet.
+**Document audit (preview).** The interface shows a document-audit option, but it is not enabled in this version. This beta audits URLs. Document auditing is part of the tool's design and is built for a production context rather than this portfolio beta.
 
 ---
 
@@ -40,14 +40,15 @@ This tool grew out of an automated audit page built for an earlier research proj
 
 ## Versions
 
-- **v0.3.0** — PDF document upload, with 10-page and 5 MB beta limits.
+- **v0.3.1** — Document audit presented as a preview, not enabled in this version. URL audit is the active feature.
+- **v0.3.0** — PDF document upload (later set to preview-only in this build).
 - **v0.2.0** — Beta framing, capped source verification per audit, single-URL scope made explicit, clear control.
 - **v0.1.0** — Initial URL audit with the two-layer report.
 
-Planned: Word document support, whole-site auditing, and access control ahead of a v1.0.0 public release.
+Planned for a production release: document and higher-volume auditing, and access control ahead of a v1.0.0 release.
 
 ---
 
 ## Status
 
-This is a beta. Limits and behavior are still being refined.
+This is a beta. It audits URLs. Limits and behavior are still being refined.
