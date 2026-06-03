@@ -73,18 +73,21 @@
   .modes { display: flex; gap: 4px; margin-bottom: 12px; }
   .mode { background: var(--panel); color: var(--muted); border: 1px solid var(--border); }
   .mode.active { background: var(--text); color: #fff; border-color: var(--text); }
-  input[type="file"] { flex: 1; padding: 8px; font: inherit; font-size: 13px;
-    border: 1px solid var(--border); border-radius: 4px; background: var(--panel); }
+  .tag { display: inline-block; font-size: 9px; font-weight: bold; padding: 1px 5px;
+    margin-left: 4px; border-radius: 3px; background: var(--info); color: #fff;
+    text-transform: uppercase; letter-spacing: 0.04em; vertical-align: middle; }
+  .preview-msg { padding: 16px; border: 1px dashed var(--border); border-radius: 4px;
+    background: var(--panel); font-size: 14px; color: var(--muted); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Content Integrity Audit <span class="beta">Beta v0.3.0</span></h1>
-  <p class="sub">Structural and factual audit of a single web page or PDF document.</p>
+  <h1>Content Integrity Audit <span class="beta">Beta v0.3.1</span></h1>
+  <p class="sub">Structural and factual audit of a web page.</p>
 
   <div class="modes">
     <button id="modeUrl" class="mode active">Audit a URL</button>
-    <button id="modeDoc" class="mode">Audit a PDF</button>
+    <button id="modeDoc" class="mode">Audit a PDF <span class="tag">Preview</span></button>
   </div>
 
   <div id="urlPanel">
@@ -97,12 +100,7 @@
   </div>
 
   <div id="docPanel" style="display:none;">
-    <div class="controls">
-      <input id="file" type="file" accept="application/pdf,.pdf" />
-      <button id="runDoc">Run Audit</button>
-      <button id="clearDoc" class="secondary">Clear</button>
-    </div>
-    <p class="hint">Upload a single PDF. Beta limits: 10 pages and 5 MB per file. These limits keep each audit fast and focused during the beta. Word documents are not supported yet. The audit reads the document, checks it for structure and completeness, and verifies factual claims against current sources. This can take up to a minute.</p>
+    <p class="preview-msg">Document audit is not enabled in this version. This beta audits URLs. Select <strong>Audit a URL</strong> above to run an audit.</p>
   </div>
 
   <div id="status" class="status"></div>
@@ -113,9 +111,6 @@
   const runBtn = document.getElementById("run");
   const clearBtn = document.getElementById("clear");
   const urlInput = document.getElementById("url");
-  const fileInput = document.getElementById("file");
-  const runDocBtn = document.getElementById("runDoc");
-  const clearDocBtn = document.getElementById("clearDoc");
   const modeUrlBtn = document.getElementById("modeUrl");
   const modeDocBtn = document.getElementById("modeDoc");
   const urlPanel = document.getElementById("urlPanel");
@@ -123,17 +118,16 @@
   const statusEl = document.getElementById("status");
   const resultsEl = document.getElementById("results");
 
-  const MAX_PDF_BYTES = 5 * 1024 * 1024; // mirror of the server cap, for a fast client-side check
-
   runBtn.addEventListener("click", runUrlAudit);
   clearBtn.addEventListener("click", resetPage);
-  runDocBtn.addEventListener("click", runDocAudit);
-  clearDocBtn.addEventListener("click", resetPage);
   urlInput.addEventListener("keydown", (e) => { if (e.key === "Enter") runUrlAudit(); });
 
   modeUrlBtn.addEventListener("click", () => switchMode("url"));
   modeDocBtn.addEventListener("click", () => switchMode("document"));
 
+  // The document tab is a preview in this version: it shows an informational
+  // message and has no controls, so it cannot trigger an audit or any cost.
+  // The document-audit logic still exists in the function for later use.
   function switchMode(mode) {
     const isUrl = mode === "url";
     urlPanel.style.display = isUrl ? "" : "none";
@@ -143,10 +137,9 @@
     resetPage();
   }
 
-  // Clear is purely browser-side: empties inputs and wipes results. No API call, no cost.
+  // Clear is purely browser-side: empties the input and wipes results. No API call, no cost.
   function resetPage() {
     urlInput.value = "";
-    fileInput.value = "";
     resultsEl.innerHTML = "";
     setStatus("");
   }
@@ -159,31 +152,6 @@
       "Auditing. Fetching the page and verifying claims. This can take up to a minute.");
   }
 
-  async function runDocAudit() {
-    resultsEl.innerHTML = "";
-    const file = fileInput.files && fileInput.files[0];
-    if (!file) { setStatus("Choose a PDF first.", true); return; }
-    if (file.type !== "application/pdf" && !file.name.toLowerCase().endsWith(".pdf")) {
-      setStatus("That is not a PDF. Only PDF files are supported in this beta.", true); return;
-    }
-    if (file.size > MAX_PDF_BYTES) {
-      setStatus(`That file is ${(file.size / 1048576).toFixed(1)} MB. The beta limit is 5 MB.`, true); return;
-    }
-
-    setStatus("Reading the document.");
-    let base64;
-    try {
-      base64 = await fileToBase64(file);
-    } catch (e) {
-      setStatus("Could not read that file. Try again.", true); return;
-    }
-
-    await runAudit(
-      { mode: "document", fileData: base64, fileName: file.name },
-      runDocBtn,
-      "Auditing the document and verifying claims. This can take up to a minute."
-    );
-  }
 
   // Shared run logic for both modes.
   async function runAudit(payload, btn, workingMsg) {
