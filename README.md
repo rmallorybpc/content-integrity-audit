@@ -24,6 +24,8 @@ The report combines both layers: a summary, a findings table ordered worst first
 
 **Document audit (preview).** The interface shows a document-audit option, but it is not enabled in this version. This beta audits URLs. Document auditing is part of the tool's design and is built for a production context rather than this portfolio beta.
 
+https://content-integrity-audit.pages.dev/
+
 ---
 
 ## How verification is scoped
